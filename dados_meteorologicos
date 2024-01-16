@@ -1,0 +1,38 @@
+@ -0,0 +1,34 @@
+from csv import reader
+import pandas as pd
+
+# Inicializa um DataFrame vazio
+dados_acumulados = pd.DataFrame()
+
+# Aqui você abre a planilha em .csv com a relação de caminhos das planilhas que possuem os dados
+  with open("C:/Users/mpjun/OneDrive/Documentos/.Mestrado UNB/Cartografia/Clima e Temperatura/dados_meteoro_caminhos.csv", "r") as csv_file:
+    caminho_meteoro = list(reader(csv_file))
+
+# Aqui a planilha, que virou uma lista, terá cada dado percorrido em um laço de repetição _for para que todos os caminhos dos dados sejam acessados
+for a in range(0, len(caminho_meteoro)):
+    caminho = caminho_meteoro[a][0]
+
+# A peridicidade mais longa dos dados doo Inmet disponibilizados são mensais. Sendo assim, como forma de realizar o comparativo, é feita a média dos dados para o ano escolhido
+    media_anual = (
+        pd.read_csv(caminho, sep=';', skiprows=10)
+        .drop(["Unnamed: 7", "Data Medicao", "NUMERO DE DIAS COM PRECIP. PLUV, MENSAL (AUT)(número)"], axis=1) # É importante destacar que existem colunas que não possuem dados importantes, sendo relevante retirá-las, como os dias e a data da medição
+        .mean()
+        .to_frame()
+        .T
+    )
+    media_anual.insert(0, "ANO", 2023) # Foi adicionada uma coluna para inserir qual o ano que representam os dados
+    
+    coordenadas = pd.read_csv(caminho, sep=':', header=None, skiprows=lambda x: x not in [2, 3]) # Para georreferenciar as estações, foi extraído doo arquivo original as coordenadas em latitude e longitude, importantes para serem utilizadas em softwares GIS
+    coordx, coordy = coordenadas.iloc[1, 1], coordenadas.iloc[0, 1]
+
+    media_anual["Longitude (X)"] = coordx # Foi adicionada uma coluna com os dados da longitude
+    media_anual["Latitude (Y)"] = coordy # Foi adicionada uma coluna com os dados da latitude
+
+    # Concatena o DataFrame atual ao DataFrame acumulado
+    dados_acumulados = pd.concat([dados_acumulados, media_anual], ignore_index=True) # Como são vários dataframes criados, há uma concatenação deles para que se tornem apenas uma única tabela
+
+display(dados_acumulados)
+
+# Salva os dados acumulados em um arquivo CSV
+dados_acumulados.to_csv("dados_meteorologicos_2023.csv", index=False) # Por fim, foi feita a conversão da tabela resultante em um arquivo csv, para posterior uso
