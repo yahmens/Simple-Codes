@@ -35,4 +35,4 @@ for a in range(0, len(caminho_meteoro)):
 display(dados_acumulados)
 
 # Salva os dados acumulados em um arquivo CSV
-dados_acumulados.to_csv("dados_meteorologicos_2023.csv", index=False) # Por fim, foi feita a conversão da tabela resultante em um arquivo csv, para posterior uso
+dados_acumulados.to_csv("dados_meteorologicos_20231.csv", sep=';', encoding = 'utf-8', decimal = ',', index=False) # Por fim, foi feita a conversão da tabela resultante em um arquivo csv, para posterior uso
