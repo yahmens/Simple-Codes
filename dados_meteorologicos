@@ -4,7 +4,7 @@ import pandas as pd
 # Inicializa um DataFrame vazio
 dados_acumulados = pd.DataFrame()
 
-with open("C:/Users/mpjun/OneDrive/Documentos/.Mestrado UNB/Cartografia/Clima e Temperatura/dados_meteoro_caminhos.csv", "r") as csv_file:
+with open("caminho_do_arquivo_csv.csv", "r") as csv_file:
     caminho_meteoro = list(reader(csv_file))
     
 for a in range(0, len(caminho_meteoro)):
@@ -56,7 +56,7 @@ nomes_meses = {
     10: "Outubro", 11: "Novembro", 12: "Dezembro"
 }
 
-with open("C:/Users/mpjun/OneDrive/Documentos/.Mestrado UNB/Cartografia/Clima e Temperatura/dados_meteoro_caminhos.csv", "r") as csv_file:
+with open("caminho_do_arquivo_csv.csv", "r") as csv_file:
     caminho_meteoro = list(reader(csv_file))
     
 for a in range(0, len(caminho_meteoro)):
