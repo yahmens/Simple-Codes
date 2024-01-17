@@ -1,38 +1,124 @@
-@ -0,0 +1,34 @@
 from csv import reader
 import pandas as pd
 
 # Inicializa um DataFrame vazio
 dados_acumulados = pd.DataFrame()
 
-# Aqui você abre a planilha em .csv com a relação de caminhos das planilhas que possuem os dados
-  with open("C:/Users/mpjun/OneDrive/Documentos/.Mestrado UNB/Cartografia/Clima e Temperatura/dados_meteoro_caminhos.csv", "r") as csv_file:
+with open("C:/Users/mpjun/OneDrive/Documentos/.Mestrado UNB/Cartografia/Clima e Temperatura/dados_meteoro_caminhos.csv", "r") as csv_file:
     caminho_meteoro = list(reader(csv_file))
-
-# Aqui a planilha, que virou uma lista, terá cada dado percorrido em um laço de repetição _for para que todos os caminhos dos dados sejam acessados
+    
 for a in range(0, len(caminho_meteoro)):
     caminho = caminho_meteoro[a][0]
-
-# A peridicidade mais longa dos dados doo Inmet disponibilizados são mensais. Sendo assim, como forma de realizar o comparativo, é feita a média dos dados para o ano escolhido
+    
     media_anual = (
         pd.read_csv(caminho, sep=';', skiprows=10)
-        .drop(["Unnamed: 7", "Data Medicao", "NUMERO DE DIAS COM PRECIP. PLUV, MENSAL (AUT)(número)"], axis=1) # É importante destacar que existem colunas que não possuem dados importantes, sendo relevante retirá-las, como os dias e a data da medição
+        .drop(["Unnamed: 7", "Data Medicao"], axis=1)
+
         .mean()
         .to_frame()
         .T
     )
-    media_anual.insert(0, "ANO", 2023) # Foi adicionada uma coluna para inserir qual o ano que representam os dados
+    media_anual.rename(columns={nome_antigo: nome_antigo.replace("MENSAL", "MEDIA ANUAL") for nome_antigo in media_anual.columns}, inplace=True) 
+    media_anual.insert(0, "ANO", 2023)
     
-    coordenadas = pd.read_csv(caminho, sep=':', header=None, skiprows=lambda x: x not in [2, 3]) # Para georreferenciar as estações, foi extraído doo arquivo original as coordenadas em latitude e longitude, importantes para serem utilizadas em softwares GIS
+    coordenadas = pd.read_csv(caminho, sep=':', header=None, skiprows=lambda x: x not in [2, 3])
     coordx, coordy = coordenadas.iloc[1, 1], coordenadas.iloc[0, 1]
 
-    media_anual["Longitude (X)"] = coordx # Foi adicionada uma coluna com os dados da longitude
-    media_anual["Latitude (Y)"] = coordy # Foi adicionada uma coluna com os dados da latitude
+    media_anual["X"] = float(coordx)
+    media_anual["Y"] = float(coordy)
 
     # Concatena o DataFrame atual ao DataFrame acumulado
-    dados_acumulados = pd.concat([dados_acumulados, media_anual], ignore_index=True) # Como são vários dataframes criados, há uma concatenação deles para que se tornem apenas uma única tabela
+    dados_acumulados = pd.concat([dados_acumulados, media_anual], ignore_index=True)
 
 display(dados_acumulados)
 
 # Salva os dados acumulados em um arquivo CSV
-dados_acumulados.to_csv("dados_meteorologicos_20231.csv", sep=';', encoding = 'utf-8', decimal = ',', index=False) # Por fim, foi feita a conversão da tabela resultante em um arquivo csv, para posterior uso
+dados_acumulados.to_csv("dados_meteorologicos_2023.csv", sep=',', decimal = ',', encoding = 'utf-8', index=False)
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
+##PARA OS DADOS TRIMESTRAIS, SEGUE O CÓDIGO ABAIXO
+
+import pandas as pd
+from csv import reader
+
+# Inicializa DataFrames para cada estação
+dados_verao = pd.DataFrame()
+dados_outono = pd.DataFrame()
+dados_inverno = pd.DataFrame()
+dados_primavera = pd.DataFrame()
+
+# Mapeamento de números para nomes dos meses
+nomes_meses = {
+    1: "Janeiro", 2: "Fevereiro", 3: "Março",
+    4: "Abril", 5: "Maio", 6: "Junho",
+    7: "Julho", 8: "Agosto", 9: "Setembro",
+    10: "Outubro", 11: "Novembro", 12: "Dezembro"
+}
+
+with open("C:/Users/mpjun/OneDrive/Documentos/.Mestrado UNB/Cartografia/Clima e Temperatura/dados_meteoro_caminhos.csv", "r") as csv_file:
+    caminho_meteoro = list(reader(csv_file))
+    
+for a in range(0, len(caminho_meteoro)):
+    caminho = caminho_meteoro[a][0]
+    
+    # Lê os dados e remove colunas indesejadas
+    dados = pd.read_csv(caminho, sep=';', skiprows=10)
+    dados.drop(["Unnamed: 7", "Data Medicao"], axis=1, inplace=True)
+
+    # Renomeia as partes das colunas de 'mensal' para 'trimestral'
+    novos_nomes = {nome_antigo: nome_antigo.replace("MENSAL", "TRIMESTRAL") for nome_antigo in dados.columns}
+    dados.rename(columns=novos_nomes, inplace=True)
+
+    # Adiciona a coluna 'Mês' temporariamente para o cálculo
+    num_linhas = len(dados)
+    dados['Mês'] = list(range(1, num_linhas + 1))
+
+    # Define os meses de cada estação
+    estacoes = {
+        'Verão': [12, 1, 2],
+        'Outono': [3, 4, 5],
+        'Inverno': [6, 7, 8],
+        'Primavera': [9, 10, 11]
+    }
+
+    # Processa e concatena os dados para cada estação
+    for estacao, meses in estacoes.items():
+        # Cria uma string com os meses por extenso
+        meses_extenso = ', '.join([nomes_meses[mes] for mes in meses])
+        medias = dados[dados['Mês'].isin(meses)].mean().to_frame().T
+        medias["MESES"] = meses_extenso
+        medias.insert(0, "ESTAÇÃO CLIMÁTICA", estacao)
+        
+        # Remove a coluna 'Mês' do DataFrame final
+        medias.drop(['Mês'], axis=1, inplace=True)
+
+        # Lê as coordenadas e a localização das estações meteorológicas
+        local = pd.read_csv(caminho, sep=':', header=None, skiprows=lambda x: x not in [0])
+        localizacao = local.iloc[0,1]
+        coordenadas = pd.read_csv(caminho, sep=':', header=None, skiprows=lambda x: x not in [2, 3])
+        coordx, coordy = coordenadas.iloc[1, 1], coordenadas.iloc[0, 1]
+        medias.insert(1,"ESTAÇÃO METEOROLÓGICA (AUT)", str(localizacao))
+        medias["X"] = float(coordx)
+        medias["Y"] = float(coordy)
+
+        if estacao == 'Verão':
+            dados_verao = pd.concat([dados_verao, medias], ignore_index=True)
+        elif estacao == 'Outono':
+            dados_outono = pd.concat([dados_outono, medias], ignore_index=True)
+        elif estacao == 'Inverno':
+            dados_inverno = pd.concat([dados_inverno, medias], ignore_index=True)
+        elif estacao == 'Primavera':
+            dados_primavera = pd.concat([dados_primavera, medias], ignore_index=True)
+
+# Exibe os DataFrames
+display(dados_verao)
+display(dados_outono)
+display(dados_inverno)
+display(dados_primavera)
+
+# Salva os DataFrames em arquivos CSV separados
+dados_verao.to_csv("dados_verao_2023_atual.csv", sep=',', decimal=',', encoding='utf-8', index=False)
+dados_outono.to_csv("dados_outono_2023_atual.csv", sep=',', decimal=',', encoding='utf-8', index=False)
+dados_inverno.to_csv("dados_inverno_2023_atual.csv", sep=',', decimal=',', encoding='utf-8', index=False)
+dados_primavera.to_csv("dados_primavera_2023_atual.csv", sep=',', decimal=',', encoding='utf-8', index=False)
