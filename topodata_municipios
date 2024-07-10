@@ -16,14 +16,14 @@ def clean_string(input_string):
 layer_name = 'nome da camada dos municipios'
 
 # Faixa de IDs das feições que você quer processar (neste caso, de 3267 a 3911)
-start_fid = 3267
-end_fid = 3911
+start_fid = 3268
+end_fid = 3912
 
 # Acessando a camada pelo nome
 layer = QgsProject.instance().mapLayersByName(layer_name)[0]
 
 # Nome da camada do raster que você quer recortar
-raster_layer_name = 'Mosaico_SP'
+raster_layer_name = 'nome da camada raster'
 
 # Acessando a camada do raster pelo nome
 raster_layer = QgsProject.instance().mapLayersByName(raster_layer_name)[0]
