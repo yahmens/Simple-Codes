@@ -1,0 +1,114 @@
+# Importando os módulos necessários
+from qgis.core import QgsVectorLayer, QgsRasterLayer, QgsProject, QgsFeatureRequest
+from qgis.PyQt.QtCore import QVariant
+import processing
+import unicodedata
+import re
+import os
+
+# Função para remover acentos, substituir espaços por underline e converter para minúsculas
+def clean_string(input_string):
+		nfkd_form = unicodedata.normalize('NFKD', input_string)
+    only_ascii = nfkd_form.encode('ASCII', 'ignore').decode('ASCII')
+    return re.sub(r'\s+', '_', only_ascii).lower()
+
+# Nome da camada que você está trabalhando
+layer_name = 'nome da camada dos municipios'
+
+# Faixa de IDs das feições que você quer processar (neste caso, de 3267 a 3911)
+start_fid = 3267
+end_fid = 3911
+
+# Acessando a camada pelo nome
+layer = QgsProject.instance().mapLayersByName(layer_name)[0]
+
+# Nome da camada do raster que você quer recortar
+raster_layer_name = 'Mosaico_SP'
+
+# Acessando a camada do raster pelo nome
+raster_layer = QgsProject.instance().mapLayersByName(raster_layer_name)[0]
+
+# Diretório para salvar os rasters recortados
+output_directory = r"caminho do diretorio"
+
+# Verificando se o diretório existe, caso contrário, criando-o
+if not os.path.exists(output_directory):
+    os.makedirs(output_directory)
+
+# Processamento em lote
+for feature_id in range(start_fid, end_fid + 1):
+    # Criando uma requisição para selecionar a feição com o ID desejado
+    request = QgsFeatureRequest().setFilterFid(feature_id)
+
+    # Selecionando a feição
+    selected_features = layer.getFeatures(request)
+    selected_feature = None
+    for feature in selected_features:
+        layer.selectByIds([feature.id()])
+        selected_feature = feature
+
+    if not selected_feature:
+        print(f"Feição com fid {feature_id} não encontrada.")
+        continue
+
+    # Exportando a feição selecionada para uma memória temporária
+    memory_layer = QgsVectorLayer("Polygon?crs=EPSG:4326", f"temporary_memory_layer_{feature_id}", "memory")
+    memory_layer_data = memory_layer.dataProvider()
+    memory_layer.startEditing()
+    memory_layer_fields = layer.fields()
+
+    # Adicionando os atributos à camada de memória
+    memory_layer_data.addAttributes(memory_layer_fields.toList())
+    memory_layer.updateFields()
+
+    # Copiando os dados da feição selecionada para a camada de memória
+    memory_layer_data.addFeatures([selected_feature])
+    memory_layer.commitChanges()
+
+    # Carregando a camada de memória temporária no QGIS
+    QgsProject.instance().addMapLayer(memory_layer)
+
+    # Extraindo o nome do município da feição selecionada
+    mun_name = selected_feature['nm_mun'] if selected_feature else 'undefined_municipio'
+
+    # Removendo acentos, substituindo espaços por underline e convertendo para minúsculas
+    mun_name_clean = clean_string(mun_name)
+
+    clipped_raster_path = os.path.join(output_directory, f"{mun_name_clean}.tif")
+
+    # Opções para o recorte
+    clipping_extent = memory_layer.extent()  # Extensão da camada de máscara
+    output_resolution = raster_layer.rasterUnitsPerPixelX()  # Resolução do raster de entrada
+
+    # Configurando parâmetros para o recorte
+    options = {
+        'INPUT': raster_layer.source(),
+        'MASK': memory_layer,
+        'OUTPUT': clipped_raster_path,
+        'SOURCE_CRS': raster_layer.crs(),
+        'TARGET_CRS': raster_layer.crs(),
+        'TR': [output_resolution, output_resolution],  # Ajustando a resolução
+        'RT': True,
+        'EXTENT': f"{clipping_extent.xMinimum()},{clipping_extent.xMaximum()},{clipping_extent.yMinimum()},{clipping_extent.yMaximum()}",
+        'NODATA': 0  # Definindo pixels com valor 0 como NoData
+    }
+
+    # Executando o algoritmo de recorte
+    processing.run("gdal:cliprasterbymasklayer", options)
+
+    # Verificando se o arquivo do raster recortado foi criado corretamente
+    if os.path.exists(clipped_raster_path):
+        # Carregando o raster recortado
+        clipped_raster_layer = QgsRasterLayer(clipped_raster_path, f"{mun_name_clean}")
+        if not clipped_raster_layer.isValid():
+            print(f"Erro ao carregar o raster recortado para o municipio {mun_name_clean}!")
+        # else:
+            # Adicionando a camada recortada ao projeto do QGIS
+            # QgsProject.instance().addMapLayer(clipped_raster_layer)
+
+        # Limpando a camada de máscara da memória temporária
+        QgsProject.instance().removeMapLayer(memory_layer.id())
+    else:
+        print(f"O arquivo do raster recortado não foi encontrado em: {clipped_raster_path}")
+
+print("Processamento em lote concluído!")
